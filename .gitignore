@@ -1,0 +1,36 @@
+# Julia
+Manifest.toml
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+deps/deps.jl
+docs/build/
+docs/site/
+
+# FFT wisdom files
+FFTWwisdom/
+
+# Output and temporary files
+*.h5
+*.bin
+*.dat
+tables/
+test/test_output/
+test/FFTWwisdom/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+*~
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude/
