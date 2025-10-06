@@ -23,8 +23,9 @@ LNMock.jl generates 3D lognormal density fields and converts them to discrete ga
 ```julia
 using Pkg
 
-# Install cosmology dependency first
+# Install dependencies
 Pkg.add(url="https://github.com/djeong98/cosmology.jl")
+Pkg.add(url="https://github.com/djeong98/CosmoFFTs.jl")
 
 # Install LNMock
 Pkg.add(url="https://github.com/djeong98/LNMock.jl")
@@ -176,12 +177,13 @@ mpiexec -n 32 julia --project script.jl
 ## Requirements
 
 - Julia ≥ 1.9
+- CosmoFFTs.jl (https://github.com/djeong98/CosmoFFTs.jl)
+- cosmology.jl (https://github.com/djeong98/cosmology.jl)
 - FFTW.jl
 - HDF5.jl
 - Distributions.jl
 - Interpolations.jl
 - FLoops.jl
-- cosmology.jl
 - (Optional) MPI.jl for parallel execution
 - (Optional) PencilFFTs.jl for MPI backend
 
@@ -194,7 +196,7 @@ If you use this package in your research, please cite:
   author = {Donghui Jeong},
   title = {LNMock.jl: Lognormal Mock Galaxy Generator},
   year = {2025},
-  url = {https://github.com/yourusername/LNMock.jl}
+  url = {https://github.com/djeong98/LNMock.jl}
 }
 ```
 

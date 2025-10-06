@@ -22,11 +22,9 @@ using FFTW, Random
 using FLoops
 using Distributions: Poisson
 using HDF5
-using ..LNMock: DEFAULT_BACKEND, compute_aHf, make_plan, forwardFT!, inverseFT!
+using ..LNMock: DEFAULT_BACKEND, FFTPlanSpec, FourierArrayInfo, allocate_fields, compute_aHf, make_plan, forwardFT!, inverseFT!
 using ..Spectra: get_fpk
 using ..Cosmology: compute_aHf
-using ..BackendDispatch
-using ..BackendDispatch: FFTPlanSpec, make_plan, allocate_fields
 
 # Conditional MPI support - imported only when pencil_mpi backend is used
 # Access MPI through parent module to avoid hard dependency
@@ -173,29 +171,31 @@ end
 Generate the 3D density field following the power spectrum fpk.
 
 """
-function gen_deltaLk!(deltaL,deltak,fftplan,Finfo,fpk)
-    # First, compute the inverse FFT to get the uni-variant delta(k) field
-    # Here, deltaL is properly normalized
-    forwardFT!(deltak,fftplan,deltaL)
-    
-    VoverN=sqrt(Finfo.Volume/Finfo.Ntotal)
-    multiply_pk!(deltak,Finfo.ak1,Finfo.ak2,Finfo.ak3,Finfo.akmag,fpk,VoverN)
+function gen_deltaLk!(deltaL, deltak, fftplan, Finfo, fpk)
+    # First, compute the forward FFT to get the complex delta(k) field
+    forwardFT!(deltak, fftplan, deltaL)
+
+    scale = sqrt(Finfo.Ntotal / Finfo.Volume)
+    multiply_pk!(deltak, Finfo.akmag, fpk, scale)
+    return nothing
 end
 """
- multiply_pk!(deltak,ak1,ak2,ak3,akmag,fpk)
+ multiply_pk!(deltak, akmag, fpk, scale)
 
-Multiply the power spectrum to give the proper variance of deltak. 
-The normalization factor for the GRand3D! for rfft is sqrt[VP(k)/N], 
-but because we use forwardFT!, with an extra factor of V/N, we have to multiply sqrt[P(k)N/V].
+Multiply the power spectrum to give the proper variance of deltak.
+The normalization factor for the GRand3D! for rfft is sqrt[VP(k)/N].
+Because `forwardFT!` introduces an extra V/N, we multiply by sqrt[P(k)N/V].
 """
-function multiply_pk!(deltak,ak1,ak2,ak3,akmag,fpk,VoverN)
-    @inbounds for ik3 in 1:length(ak3)
-        @inbounds for ik2 in 1:length(ak2)
-            @inbounds for ik1 in 1:length(ak1)
-                knum = akmag[ik1,ik2,ik3]
-                pknum = knum>zero(knum) ? fpk(knum) : zero(knum)
-                @inbounds deltak[ik1,ik2,ik3] *= sqrt(pknum/VoverN)
-    end;end;end
+function multiply_pk!(deltak, akmag, fpk, scale)
+    @inbounds for idx in CartesianIndices(deltak)
+        knum = akmag[idx]
+        if knum > 0
+            deltak[idx] *= sqrt(fpk(knum)) * scale
+        else
+            deltak[idx] = 0.0
+        end
+    end
+    return nothing
 end
 # ------------------------------------------------------------------------------
 # Computing mean and variance
@@ -685,7 +685,7 @@ function run_lognormal(cfg::LNConfig)
     @info "Running lognormal mock generation with backend $(DEFAULT_BACKEND[])"
    
     # FFT plan spec
-    spec = BackendDispatch.FFTPlanSpec(cfg.dims, cfg.boxsize,comm=cfg.comm, backend=DEFAULT_BACKEND[])
+    spec = FFTPlanSpec(cfg.dims, cfg.boxsize; comm=cfg.comm, backend=DEFAULT_BACKEND[])
     # Make the FFT plan
     fftplan = make_plan(spec)
 
@@ -707,9 +707,9 @@ function run_lognormal(cfg::LNConfig)
 
     # -- Allocate arrays
     allocmem = @allocated etime = @elapsed begin
-        if spec.backend==:pencil_mpi
-            deltar, deltak = allocate_fields(spec,fftplan.plan)
-            Finfo = FourierArrayInfo(spec,fftplan.plan)
+        if spec.backend == :pencil_mpi
+            deltar, deltak = allocate_fields(spec; fftplan=fftplan)
+            Finfo = FourierArrayInfo(spec; plan=fftplan)
         else
             deltar, deltak = allocate_fields(spec)
             Finfo = FourierArrayInfo(spec)

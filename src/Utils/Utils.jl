@@ -10,9 +10,7 @@ function broadcast_scalar(val, comm)
         return val
     end
     MPI = _get_MPI()
-    buf = [val]
-    MPI.Bcast!(buf, root=0, comm)
-    return buf[1]
+    return MPI.bcast(val, 0, comm)
 end
 
 """

@@ -1,5 +1,6 @@
 using Test, Random, FFTW
 using LNMock: LNConfig, compute_aHf, FFTPlanSpec, forwardFT!, inverseFT!, make_plan, allocate_fields, run_lognormal, BackendDispatch
+using CosmoFFTs: set_backend!, reinitialize!
 import LNMock
 
 # MPI and PencilFFTs are optional - only load if available
@@ -166,6 +167,10 @@ function run_tests()
                     MPI.Init()
                 end
 
+                # Switch backend to PencilFFTs MPI and reinitialize
+                set_backend!(:pencil_mpi)
+                reinitialize!()
+
                 dims      = (32, 32, 32)
                 Lbox      = 100
                 boxsize   = (Lbox,Lbox,Lbox)
@@ -202,6 +207,10 @@ function run_tests()
                 if rank == 0
                     println("✓ PencilFFTs MPI tests passed")
                 end
+
+                # Reset backend to default for subsequent tests
+                set_backend!(:fftw_single)
+                reinitialize!()
             end
         else
             @testset "Backend - PencilFFTs MPI" begin
