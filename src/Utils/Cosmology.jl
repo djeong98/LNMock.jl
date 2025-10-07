@@ -21,7 +21,7 @@ or whenever you want to switch models.
 """
 function set_cosmology!(; H0=0.6766, Om=0.3111, Ol=0.6889, Ob=0.048975,
                          calc_growth=true, Tcmb=0.0, unit="Mpc")
-    _COSMO[] = cosParams(H0, Om, Ol; Ob=Ob, calc_growth=calc_growth, Tcmb=Tcmb, unit=unit)
+    _COSMO[] = cosParams(H0=H0, Om=Om, Ol=Ol, Ob=Ob, calc_growth=calc_growth, Tcmb=Tcmb, unit=unit)
     return _COSMO[]
 end
 
