@@ -739,7 +739,7 @@ function run_lognormal(cfg::LNConfig)
         if cfg.computeGRF
             etime = @elapsed gen_GRand3d!(v1,rseed,cfg.comm)
             @info("generating grf in $etime seconds...")
-            if cfg.writeGFR
+            if cfg.writeGRF
                 GRFfile = joinpath(cfg.outdir,cfg.GRFfilehead*"_$iLN.h5")
                 write_GRand3d(v1,GRFfile)
             end
