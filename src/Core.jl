@@ -67,7 +67,7 @@ Base.@kwdef struct LNConfig
     nsub::NTuple{3,Int} = (1,1,1)
     nreal::Int = 1
     seed::UInt64 = 3141592653
-    computeGRF = false
+    computeGRF = true
     writeGRF = false
     GRFfilehead = nothing
     comm = nothing
@@ -739,8 +739,10 @@ function run_lognormal(cfg::LNConfig)
         if cfg.computeGRF
             etime = @elapsed gen_GRand3d!(v1,rseed,cfg.comm)
             @info("generating grf in $etime seconds...")
-            GRFfile = joinpath(cfg.outdir,cfg.GRFfilehead*"_$iLN.h5")
-            cfg.writeGRF && write_GRand3d(v1,GRFfile)
+            if cfg.writeGFR
+                GRFfile = joinpath(cfg.outdir,cfg.GRFfilehead*"_$iLN.h5")
+                write_GRand3d(v1,GRFfile)
+            end
         else
             GRFfile = joinpath(cfg.outdir,cfg.GRFfilehead*"_$iLN.h5")
             read_GRand3d!(v1,GRFfile,Finfo)
