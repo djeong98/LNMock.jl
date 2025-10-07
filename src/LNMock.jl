@@ -39,9 +39,14 @@ Initialize cosmology for MPI backend. Must be called explicitly in MPI scripts
 after MPI is initialized. Only rank 0 computes cosmology; result is broadcast to all ranks.
 """
 function init_cosmology_mpi!(; H0=nothing, Om=nothing, Ol=nothing, Ob=nothing)
-    using MPI
-    comm = MPI.COMM_WORLD
-    rank = MPI.Comm_rank(comm)
+    # MPI must already be loaded by the user's script
+    MPI_mod = Base.get_extension(CosmoFFTs, :MPI)
+    if MPI_mod === nothing
+        MPI_mod = Main.MPI
+    end
+
+    comm = MPI_mod.COMM_WORLD
+    rank = MPI_mod.Comm_rank(comm)
 
     # Parse environment or use defaults
     H0_val = H0 !== nothing ? H0 : parse(Float64, get(ENV, "LN_H0", "0.6766"))
@@ -59,7 +64,7 @@ function init_cosmology_mpi!(; H0=nothing, Om=nothing, Ol=nothing, Ob=nothing)
     end
 
     # Broadcast cosmology object from rank 0 to all ranks
-    cosmo_obj = MPI.bcast(cosmo_obj, 0, comm)
+    cosmo_obj = MPI_mod.bcast(cosmo_obj, 0, comm)
 
     # Set broadcasted cosmology on non-root ranks
     if rank != 0
