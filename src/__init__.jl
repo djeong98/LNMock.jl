@@ -14,9 +14,9 @@ function __init__()
 
         if backend == :pencil_mpi
             # MPI backend: compute cosmology only on rank 0, broadcast to others
-            using MPI
-            comm = MPI.COMM_WORLD
-            rank = MPI.Comm_rank(comm)
+            # MPI is already loaded by CosmoFFTs when backend is :pencil_mpi
+            comm = Main.MPI.COMM_WORLD
+            rank = Main.MPI.Comm_rank(comm)
 
             local cosmo_obj
             if rank == 0
@@ -31,7 +31,7 @@ function __init__()
             end
 
             # Broadcast the entire cosmology object from rank 0 to all ranks
-            cosmo_obj = MPI.bcast(cosmo_obj, 0, comm)
+            cosmo_obj = Main.MPI.bcast(cosmo_obj, 0, comm)
 
             # Set the broadcasted cosmology on non-root ranks
             if rank != 0
