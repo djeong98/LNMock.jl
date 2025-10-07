@@ -52,9 +52,7 @@ config = LNConfig(
     pkgA_file = "path/to/galaxy_pk.dat",   # Galaxy power spectrum
     outdir = "output",                # Output directory
     outhead = "mock",                 # Output file prefix
-    nreal = 10,                       # Number of realizations
-    computeGRF = true,                # Compute Gaussian random field
-    writeGRF = false                  # Save GRF to disk
+    nreal = 10                       # Number of realizations
 )
 
 # Run the mock generation
@@ -74,6 +72,11 @@ julia script.jl
 export LN_BACKEND=fftw_threads
 export LN_THREADS=8
 julia script.jl
+
+or you can set the environment variables before calling the module:
+ENV["LN_BACKEND"]="fftw_threads"
+ENV["LN_THREADS"]=3
+using LNMock: LNConfig, run_lognormal
 
 # MPI-parallelized
 export LN_BACKEND=pencil_mpi
@@ -112,9 +115,9 @@ Galaxy catalogs are saved as HDF5 files containing:
 - `nsub`: Sub-box divisions (default: (1,1,1))
 - `nreal`: Number of realizations (default: 1)
 - `seed`: Random seed (default: 3141592653)
-- `computeGRF`: Generate new Gaussian random field (default: false)
+- `computeGRF`: Generate new Gaussian random field (default: true)
 - `writeGRF`: Save GRF to disk (default: false)
-- `GRFfilehead`: GRF file prefix (required if computeGRF=true)
+- `GRFfilehead`: GRF file prefix (required if writeGRF=true)
 - `comm`: MPI communicator (for MPI backend only)
 
 ## Cosmology
