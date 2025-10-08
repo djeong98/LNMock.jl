@@ -54,22 +54,20 @@ function init_cosmology_mpi!(; H0=nothing, Om=nothing, Ol=nothing, Ob=nothing)
     Ol_val = Ol !== nothing ? Ol : parse(Float64, get(ENV, "LN_OMEGA_L", "0.6889"))
     Ob_val = Ob !== nothing ? Ob : parse(Float64, get(ENV, "LN_OMEGA_B", "0.048975"))
 
+    # Rank 0 initializes cosmology, others prepare to receive
     local cosmo_obj
     if rank == 0
         cosmo_obj = set_cosmology!(H0=H0_val, Om=Om_val, Ol=Ol_val, Ob=Ob_val,
                                    calc_growth=true, Tcmb=0.0, unit="Mpc")
         @info "Cosmology initialized on rank 0" H0=H0_val Om=Om_val Ol=Ol_val Ob=Ob_val
-    else
-        cosmo_obj = nothing
     end
 
     # Broadcast cosmology object from rank 0 to all ranks
-    cosmo_obj = MPI_mod.bcast(cosmo_obj, 0, comm)
+    # All ranks must participate in bcast (collective operation)
+    cosmo_obj = MPI_mod.bcast(rank == 0 ? cosmo_obj : nothing, comm; root=0)
 
-    # Set broadcasted cosmology on non-root ranks
-    if rank != 0
-        Cosmology._COSMO[] = cosmo_obj
-    end
+    # Set broadcasted cosmology on all ranks
+    Cosmology._COSMO[] = cosmo_obj
 
     return nothing
 end
