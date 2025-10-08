@@ -352,34 +352,94 @@ end
  Note the sign and amplitude difference between this theta_to_velocity! in GridSPT code.
 """
 function ddot_to_velocity!(deltar,deltak,deltak2,v1,v2,v3,aHf,Finfo,fftplan)
-    ddot_to_velocity!(deltar,deltak,deltak2,v1,v2,v3,aHf,Finfo.akmag,Finfo.vk1,Finfo.vk2,Finfo.vk3,Finfo.Ntotal,fftplan)
+    backend = DEFAULT_BACKEND[]
+   if backend == :pencil_mpi
+        ddot_to_velocity_pencil!(deltar,deltak,deltak2,v1,v2,v3,aHf,Finfo,fftplan)
+    else
+        ddot_to_velocity!(deltar,deltak,deltak2,v1,v2,v3,aHf,Finfo.akmag,Finfo.vk1,Finfo.vk2,Finfo.vk3,Finfo.Ntotal,fftplan)
+    end
 end
 # -----------------------------------------------------------------------------
 function ddot_to_velocity!(deltar,deltak,deltak2,v1,v2,v3,aHf,akmag,vk1,vk2,vk3,Ntotal,fftplan)
-    
+
     # Fourier transform to get deltak
     forwardFT!(deltak2,fftplan,deltar)
+
+    # For regular FFTW arrays
     @. deltak2 = deltak2 * (im/akmag^2*aHf)
+
     # Force the DC mode to be zero
     deltak2[1,1,1] = 0.0im
-    
+
     # for v1 =============================================================
     copy!(deltak,deltak2)
     @. deltak = deltak * vk1
     # inverse Fourier transformation
     inverseFT!(v1,fftplan,deltak)
-    
+
     # for v2 =============================================================
     copy!(deltak,deltak2)
     @. deltak = deltak * vk2
     # inverse Fourier transformation
     inverseFT!(v2,fftplan,deltak)
-    
+
     # for v3 =============================================================
     copy!(deltak,deltak2)
     @. deltak = deltak * vk3
     # inverse Fourier transformation
     inverseFT!(v3,fftplan,deltak)
+end
+# -----------------------------------------------------------------------------
+# PencilFFTs version: rebuild k-arrays from 1D slices
+function ddot_to_velocity_pencil!(deltar,deltak,deltak2,v1,v2,v3,aHf,Finfo,fftplan)
+    # Fourier transform to get deltak2
+    forwardFT!(deltak2,fftplan,deltar)
+
+    # Rebuild 3D k-arrays from the 1D slices stored in Finfo
+    # These match the local dimensions of deltak2.data
+    vk1_local = reshape(Finfo.ak1, length(Finfo.ak1), 1, 1)
+    vk2_local = reshape(Finfo.ak2, 1, length(Finfo.ak2), 1)
+    vk3_local = reshape(Finfo.ak3, 1, 1, length(Finfo.ak3))
+
+    # Compute k-magnitude squared - broadcast to match deltak2.data size
+    # Broadcasting with scalars along singleton dimensions
+    data_size = size(deltak2.data)
+    akmag_sq = Array{Float64}(undef, data_size)
+    for k in 1:data_size[3], j in 1:data_size[2], i in 1:data_size[1]
+        akmag_sq[i,j,k] = Finfo.ak1[i]^2 + Finfo.ak2[j]^2 + Finfo.ak3[k]^2
+    end
+
+    # Apply velocity divergence factor
+    factor = im * aHf
+    for idx in eachindex(deltak2.data)
+        deltak2.data[idx] *= factor / akmag_sq[idx]
+    end
+
+    # Force the DC mode to be zero (check if this rank owns it)
+    if 1 ∈ eachindex(Finfo.ak1) && 1 ∈ eachindex(Finfo.ak2) && 1 ∈ eachindex(Finfo.ak3)
+        deltak2.data[1, 1, 1] = 0.0im
+    end
+
+    # Compute v1 component
+    copy!(deltak, deltak2)
+    for k in 1:data_size[3], j in 1:data_size[2], i in 1:data_size[1]
+        deltak.data[i,j,k] *= Finfo.ak1[i]
+    end
+    inverseFT!(v1, fftplan, deltak)
+
+    # Compute v2 component
+    copy!(deltak, deltak2)
+    for k in 1:data_size[3], j in 1:data_size[2], i in 1:data_size[1]
+        deltak.data[i,j,k] *= Finfo.ak2[j]
+    end
+    inverseFT!(v2, fftplan, deltak)
+
+    # Compute v3 component
+    copy!(deltak, deltak2)
+    for k in 1:data_size[3], j in 1:data_size[2], i in 1:data_size[1]
+        deltak.data[i,j,k] *= Finfo.ak3[k]
+    end
+    inverseFT!(v3, fftplan, deltak)
 end
 # -----------------------------------------------------------------------------
 # Save the galaxy position data with the velocity
