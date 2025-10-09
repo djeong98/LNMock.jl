@@ -610,68 +610,86 @@ end
 """
 function merge_rank_files(merge_base, nranks, nsub_total)
 
+    function collect_mock_data(infname)
+        h5open(infname, "r") do file
+            haskey(file, "Mock") || return nothing
+            mock_group = file["Mock"]
+            try
+                haskey(mock_group, "xyzvxvyvz") || return nothing
+                data = read(mock_group["xyzvxvyvz"])
+                ngals = haskey(mock_group, "Ngals") ? read(mock_group["Ngals"]) : size(data, 2)
+                return data, ngals
+            finally
+                close(mock_group)
+            end
+        end
+    end
+
+    function write_merged_mock(outfname, arrays, total_ngals)
+        mkpath(dirname(outfname))
+        h5open(outfname, "w") do file
+            mock_group = create_group(file, "Mock")
+            try
+                nrows = size(arrays[1], 1)
+                @assert all(size(arr, 1) == nrows for arr in arrays) "Mock datasets with inconsistent row counts"
+                merged = hcat(arrays...)
+                merged_ngals = size(merged, 2)
+                if merged_ngals != total_ngals
+                    @warn "Mismatch between concatenated Ngals and stored counts" stored=total_ngals computed=merged_ngals
+                    total_ngals = merged_ngals
+                end
+                mock_group["xyzvxvyvz"] = merged
+                mock_group["Ngals"] = total_ngals
+            finally
+                close(mock_group)
+            end
+        end
+    end
+
     if nsub_total > 1 # When the sub-division exists
         for isubindx in 1:nsub_total
-            merged_data = Dict()
-            
+            arrays = AbstractMatrix[]
+            total_ngals = 0
+
             for rank in 0:(nranks-1)
                 infname = merge_base * "_$(rank)_sub$(isubindx).h5"
-                
-                if isfile(infname)
-                    h5open(infname, "r") do file
-                        for key in keys(file)
-                            if !haskey(merged_data, key)
-                                merged_data[key] = []
-                            end
-                            push!(merged_data[key], read(file, key))
-                        end
-                    end
-                end
+                isfile(infname) || continue
+
+                data_pair = collect_mock_data(infname)
+                isnothing(data_pair) && continue
+
+                data, ngals = data_pair
+                push!(arrays, data)
+                total_ngals += ngals
             end
-            
-            if !isempty(merged_data)
-                final_data = Dict(key => vcat(arrays...) 
-                                 for (key, arrays) in merged_data if length(arrays) > 0)
-                
-                outfname = merge_base * "_sub$(isubindx).h5"
-                h5open(outfname, "w") do file
-                    for (key, data) in final_data
-                        write(file, key, data)
-                    end
-                end
-                println("Merged sub-box $(isubindx): $(outfname)")
-            end
+
+            isempty(arrays) && continue
+
+            outfname = merge_base * "_sub$(isubindx).h5"
+            write_merged_mock(outfname, arrays, total_ngals)
+            println("Merged sub-box $(isubindx): $(outfname)")
         end
     else
-        merged_data = Dict()
-        
+        arrays = AbstractMatrix[]
+        total_ngals = 0
+
         for rank in 0:(nranks-1)
             infname = merge_base * "_$(rank).h5"
-            
-            if isfile(infname)
-                h5open(infname, "r") do file
-                    for key in keys(file)
-                        if !haskey(merged_data, key)
-                            merged_data[key] = []
-                        end
-                        push!(merged_data[key], read(file, key))
-                    end
-                end
-            end
+            isfile(infname) || continue
+
+            data_pair = collect_mock_data(infname)
+            isnothing(data_pair) && continue
+
+            data, ngals = data_pair
+            push!(arrays, data)
+            total_ngals += ngals
         end
-        
-        if !isempty(merged_data)
-            final_data = Dict(key => vcat(arrays...) 
-                             for (key, arrays) in merged_data if length(arrays) > 0)
-            
-            outfname = merge_base * ".h5"
-            h5open(outfname, "w") do file
-                for (key, data) in final_data
-                    write(file, key, data)
-                end
-            end
-            println("✓ Merged full data: $(outfname)")
-        end
+
+        isempty(arrays) && return
+
+        outfname = merge_base * ".h5"
+        write_merged_mock(outfname, arrays, total_ngals)
+        println("✓ Merged full data: $(outfname)")
     end
 end
 # ------------------------------------------------------------------------------
