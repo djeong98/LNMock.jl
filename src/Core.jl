@@ -361,6 +361,9 @@ function ddot_to_velocity!(deltar,deltak,deltak2,v1,v2,v3,aHf,akmag,vk1,vk2,vk3,
     forwardFT!(deltak2,fftplan,deltar)
 
     # For regular FFTW arrays
+    @info "size of the akmag = $(size(akmag))"
+    @info "size of the deltak2 = $(size(deltak2))"
+
     @. deltak2 = deltak2 * (im/akmag^2*aHf)
 
     # Force the DC mode to be zero
